@@ -1,0 +1,412 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+<title>Yocto on the DK1</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap">
+<style>
+/* Layout: one reading column (44rem); figures and tables run a little wider.
+   Color carries meaning throughout: blue = the Ubuntu VM, green = the DK1 board, amber = steps you did by hand. */
+:root {
+  --bg: #f5f7fa;
+  --surface: #ffffff;
+  --fg: #16202c;
+  --muted: #586474;
+  --rule: #d8dee6;
+  --code-bg: #edf1f6;
+  --host: #2c58cc;
+  --host-soft: #e6ecfa;
+  --board: #1d7a4b;
+  --board-soft: #e2f2e9;
+  --you: #a95c08;
+  --you-soft: #fbeedc;
+
+  --font-display: "Archivo", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  --step--1: 0.84rem;
+  --step-0: 1rem;
+  --step-1: 1.2rem;
+  --step-2: 1.55rem;
+  --step-3: 2.3rem;
+  --step-4: clamp(2.4rem, 6vw, 3.6rem);
+  --measure: 44rem;
+  --wide: 56rem;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f141a;
+    --surface: #161c24;
+    --fg: #e5e9ef;
+    --muted: #9aa5b3;
+    --rule: #29313c;
+    --code-bg: #1c232c;
+    --host: #86a3f2;
+    --host-soft: #1a2440;
+    --board: #62c795;
+    --board-soft: #13291e;
+    --you: #eaa457;
+    --you-soft: #2e2213;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f141a;
+  --surface: #161c24;
+  --fg: #e5e9ef;
+  --muted: #9aa5b3;
+  --rule: #29313c;
+  --code-bg: #1c232c;
+  --host: #86a3f2;
+  --host-soft: #1a2440;
+  --board: #62c795;
+  --board-soft: #13291e;
+  --you: #eaa457;
+  --you-soft: #2e2213;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 3rem 5rem;
+}
+main { max-width: var(--wide); margin-inline: auto; display: flex; flex-direction: column; gap: 4rem; }
+.col { max-width: var(--measure); }
+section { display: flex; flex-direction: column; gap: 1.1rem; }
+
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; line-height: 1.1; }
+h1 { font-size: var(--step-4); font-weight: 800; font-variation-settings: "wdth" 82; letter-spacing: -0.01em; }
+h2 { font-size: var(--step-3); font-weight: 700; font-variation-settings: "wdth" 85; }
+h3 { font-size: var(--step-1); font-weight: 700; font-variation-settings: "wdth" 92; }
+p { margin: 0; }
+.eyebrow {
+  font-family: var(--font-mono); font-size: var(--step--1); text-transform: uppercase;
+  letter-spacing: 0.08em; color: var(--muted);
+}
+.lede { font-size: var(--step-1); color: var(--muted); max-width: 38rem; }
+a { color: var(--host); }
+:focus-visible { outline: 2px solid var(--host); outline-offset: 2px; }
+
+code, pre, .mono { font-family: var(--font-mono); font-size: 0.9em; }
+:not(pre) > code { background: var(--code-bg); padding: 0.08em 0.35em; border-radius: 4px; overflow-wrap: anywhere; }
+pre {
+  margin: 0; background: var(--code-bg); border-radius: 8px; padding: 0.9rem 1rem;
+  overflow-x: auto; line-height: 1.5; font-size: 0.84rem;
+}
+pre .c { color: var(--muted); }
+
+/* Masthead */
+.masthead { display: flex; flex-direction: column; gap: 1rem; padding-bottom: 2rem; border-bottom: 1px solid var(--rule); }
+.legend { display: flex; flex-wrap: wrap; gap: 0.6rem 1.4rem; font-size: var(--step--1); color: var(--muted); margin-top: 0.4rem; }
+.legend span { display: inline-flex; align-items: center; gap: 0.45rem; }
+.dot { width: 0.7rem; height: 0.7rem; border-radius: 50%; display: inline-block; }
+.dot.host { background: var(--host); } .dot.board { background: var(--board); } .dot.you { background: var(--you); }
+
+/* Short answers */
+.answers { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); }
+.answer { background: var(--surface); border: 1px solid var(--rule); border-radius: 10px; padding: 1.2rem 1.25rem; display: flex; flex-direction: column; gap: 0.6rem; min-width: 0; }
+.answer .q { font-family: var(--font-display); font-weight: 700; font-size: var(--step-1); font-variation-settings: "wdth" 90; line-height: 1.25; }
+.answer p { font-size: 0.95rem; }
+
+/* Two-paths figure */
+.paths { display: grid; grid-template-columns: minmax(0, 1fr) 9.5rem minmax(0, 1fr); gap: 1rem 0; align-items: stretch; }
+.lane-head { font-family: var(--font-mono); font-size: var(--step--1); text-transform: uppercase; letter-spacing: 0.08em; padding-bottom: 0.3rem; }
+.lane-head.host { color: var(--host); } .lane-head.board { color: var(--board); }
+.box { border-radius: 10px; padding: 0.95rem 1.05rem; display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
+.box.host { background: var(--host-soft); border: 1px solid color-mix(in srgb, var(--host) 35%, transparent); }
+.box.board { background: var(--board-soft); border: 1px solid color-mix(in srgb, var(--board) 35%, transparent); }
+.box strong { font-family: var(--font-display); font-variation-settings: "wdth" 92; font-size: 1.05rem; }
+.box small { color: var(--muted); font-size: var(--step--1); line-height: 1.45; }
+.arrow { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; gap: 0.25rem; padding-inline: 0.6rem; }
+.arrow .line { width: 100%; height: 2px; background: var(--fg); position: relative; }
+.arrow .line::after { content: ""; position: absolute; right: -2px; top: -5px; border-left: 9px solid var(--fg); border-top: 6px solid transparent; border-bottom: 6px solid transparent; }
+.arrow .verb { font-family: var(--font-mono); font-weight: 500; font-size: 0.9rem; }
+.arrow small { color: var(--muted); font-size: 0.75rem; line-height: 1.35; }
+.spacer { display: block; }
+@media (max-width: 640px) {
+  .paths { grid-template-columns: minmax(0, 1fr); }
+  .lane-head.board, .spacer { display: none; }
+  .arrow { padding-block: 0.2rem; }
+  .arrow .line { width: 2px; height: 1.6rem; }
+  .arrow .line::after { right: -5px; top: auto; bottom: -2px; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 9px solid var(--fg); border-bottom: 0; }
+}
+
+/* Timeline */
+.timeline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; counter-reset: step; }
+.timeline li { counter-increment: step; display: grid; grid-template-columns: 2.6rem minmax(0, 1fr); gap: 0 0.9rem; padding-block: 1rem; border-top: 1px solid var(--rule); }
+.timeline li::before {
+  content: counter(step); font-family: var(--font-display); font-weight: 800; font-size: var(--step-2);
+  font-variation-settings: "wdth" 75; color: var(--muted); line-height: 1; font-variant-numeric: tabular-nums;
+}
+.timeline .row { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.7rem; margin-bottom: 0.25rem; }
+.timeline h3 { font-size: 1.08rem; }
+.timeline p { color: var(--fg); font-size: 0.95rem; }
+.date { font-family: var(--font-mono); font-size: 0.75rem; color: var(--muted); }
+.who { font-size: 0.72rem; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; padding: 0.1rem 0.5rem; border-radius: 999px; white-space: nowrap; }
+.who.you { background: var(--you-soft); color: var(--you); }
+.who.me { background: var(--host-soft); color: var(--host); }
+.who.both { background: var(--code-bg); color: var(--muted); }
+.timeline .problem { margin-top: 0.45rem; font-size: 0.9rem; color: var(--muted); }
+
+/* Table */
+.table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; min-width: 40rem; font-size: 0.92rem; }
+th, td { text-align: left; vertical-align: top; padding: 0.75rem 0.9rem; border-bottom: 1px solid var(--rule); }
+tr:last-child td { border-bottom: 0; }
+thead th { font-family: var(--font-display); font-variation-settings: "wdth" 90; font-size: 1rem; }
+th.host { color: var(--host); } th.board { color: var(--board); }
+tbody th { font-weight: 600; color: var(--muted); font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.05em; width: 8rem; }
+
+/* make run steps */
+.steps { display: flex; flex-direction: column; gap: 1.1rem; }
+.step { display: grid; grid-template-columns: 7rem minmax(0, 1fr); gap: 0.4rem 1.2rem; align-items: start; }
+.step .where { font-family: var(--font-mono); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; padding: 0.3rem 0.5rem; border-radius: 6px; text-align: center; }
+.where.host { background: var(--host-soft); color: var(--host); }
+.where.board { background: var(--board-soft); color: var(--board); }
+.step-body { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
+@media (max-width: 520px) { .step { grid-template-columns: minmax(0, 1fr); } .step .where { justify-self: start; } }
+
+.callout { border-left: 3px solid var(--you); background: var(--you-soft); padding: 0.9rem 1.1rem; border-radius: 0 8px 8px 0; font-size: 0.95rem; }
+.callout strong { color: var(--you); }
+
+/* File map */
+.map { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); }
+.map > div { min-width: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+
+footer { color: var(--muted); font-size: var(--step--1); border-top: 1px solid var(--rule); padding-top: 1.2rem; }
+</style>
+
+<main>
+  <header class="masthead">
+    <p class="eyebrow">STM32MP157D-DK1 · Yocto 5.0 Scarthgap · 16 Oct – 6 Nov 2026</p>
+    <h1>Yocto on the DK1</h1>
+    <p class="lede">How we got from an empty Ubuntu VM to your own program blinking LED LD8 on the board: what we did, what each piece is, and how code gets from VS Code onto the board.</p>
+    <div class="legend" aria-label="Colour key">
+      <span><i class="dot host"></i>Ubuntu VM (your build machine)</span>
+      <span><i class="dot board"></i>DK1 board</span>
+      <span><i class="dot you"></i>Steps you did by hand</span>
+    </div>
+  </header>
+
+  <section aria-labelledby="answers-h">
+    <h2 id="answers-h">Your three questions</h2>
+    <div class="answers">
+      <article class="answer">
+        <p class="q">What is the SDK?</p>
+        <p>A toolkit installed on the VM in <code>~/sdk/dk1</code>. It contains a <strong>cross-compiler</strong>: it runs on the VM but produces programs for the board's ARM Cortex-A7. It also contains a copy of the board's headers and libraries, so your program is built against exactly what the board has. The SDK itself never goes on the board.</p>
+      </article>
+      <article class="answer">
+        <p class="q">SDK or flashed image: what's the difference?</p>
+        <p>The <strong>image</strong> is the board's whole system: bootloaders, kernel and root filesystem, written onto the SD card. The <strong>SDK</strong> is the tool you use on the VM to build programs for that system. Both came out of the same Yocto build, which is why they match. <code>ledblink</code> is a third thing: a program you built with the SDK and copied onto the running board.</p>
+      </article>
+      <article class="answer">
+        <p class="q">Does make flash the board, or build on it?</p>
+        <p>Neither. <code>make</code> compiles on the VM. <code>make run</code> then copies only the finished program to the board with <code>scp</code> and starts it with <code>ssh</code>. The source code stays on the VM, and the board has no compiler. Nothing is flashed either: flashing rewrites the whole SD card, while <code>scp</code> adds one file.</p>
+      </article>
+    </div>
+  </section>
+
+  <section aria-labelledby="paths-h">
+    <h2 id="paths-h">Two ways software reaches the board</h2>
+    <p class="col">Everything starts on the VM. There are two routes to the board: a slow one you rarely use, which replaces everything, and a fast one you use every time you change your code.</p>
+    <div class="paths" role="img" aria-label="Diagram: on the VM, bitbake builds an SD card image, which is flashed to the board's SD card with dd. The SDK compiles ledblink.c into an ARM binary, which is copied to the board with scp.">
+      <div class="lane-head host">Ubuntu VM · aarch64</div>
+      <div class="spacer"></div>
+      <div class="lane-head board">DK1 board · Cortex-A7</div>
+
+      <div class="box host">
+        <strong>bitbake core-image-minimal</strong>
+        <small>The Yocto build in <code>~/yocto/build-dk1</code>. Produces the SD card image: one 4.8 GB <code>.raw</code> file.</small>
+      </div>
+      <div class="arrow">
+        <span class="verb">dd</span>
+        <span class="line"></span>
+        <small>flash the whole card<br>rarely · minutes</small>
+      </div>
+      <div class="box board">
+        <strong>The SD card</strong>
+        <small>TF-A, OP-TEE, U-Boot, the Linux kernel, the DK1 device tree, and the root filesystem with dropbear SSH and gdbserver.</small>
+      </div>
+
+      <div class="box host">
+        <strong>SDK + make</strong>
+        <small><code>ledblink.c</code> is compiled by the SDK's <code>arm-poky-linux-gnueabi-gcc</code> into <code>ledblink</code>, a 26 KB 32-bit ARM program.</small>
+      </div>
+      <div class="arrow">
+        <span class="verb">scp</span>
+        <span class="line"></span>
+        <small>copy one file<br>every edit · seconds</small>
+      </div>
+      <div class="box board">
+        <strong>/home/root/ledblink</strong>
+        <small>A single file in root's home folder on the running board. Reflashing the card erases it.</small>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="done-h">
+    <h2 id="done-h">What we did</h2>
+    <p class="col">In order. The chips show who ran each step. Anything needing <code>sudo</code> or your hands on the hardware was yours.</p>
+    <ol class="timeline col">
+      <li><div>
+        <div class="row"><h3>Prepared the VM</h3><span class="who you">You</span><span class="date">16 Oct</span></div>
+        <p>Raised the VM to 6 cores and 11 GB RAM plus 4 GB swap. Installed the Yocto host packages, and relaxed an AppArmor setting that blocks a kernel feature bitbake uses to keep build tasks off the network.</p>
+      </div></li>
+      <li><div>
+        <div class="row"><h3>Fetched the layers</h3><span class="who me">Claude</span><span class="date">16 Oct</span></div>
+        <p>Cloned three layers on the <code>scarthgap</code> branch into <code>~/yocto</code>: <code>poky</code> (core Yocto and bitbake), <code>meta-openembedded</code> (extra recipes ST depends on) and <code>meta-st-stm32mp</code> (ST's board support).</p>
+      </div></li>
+      <li><div>
+        <div class="row"><h3>Configured the build for the DK1</h3><span class="who me">Claude</span><span class="date">16 Oct</span></div>
+        <p>In <code>build-dk1/conf/local.conf</code>: <code>MACHINE = "stm32mp15-disco"</code>. That machine is ST's DK2 example, so we switched its device tree to <code>stm32mp157d-dk1</code> and removed Wi-Fi and Bluetooth, which only the DK2 has. We also limited the build to 4 parallel jobs and turned on <code>rm_work</code> to save disk space.</p>
+      </div></li>
+      <li><div>
+        <div class="row"><h3>First full build</h3><span class="who me">Claude</span><span class="date">16 Oct</span></div>
+        <p><code>bitbake core-image-minimal</code>: 4,635 tasks in about 4 h 50 min. It built a cross-compiler first, then the boot firmware (TF-A, OP-TEE, U-Boot), the kernel and the root filesystem. ST's <code>create_sdcard_from_flashlayout.sh</code> then packed it all into one <code>.raw</code> SD card image.</p>
+      </div></li>
+      <li><div>
+        <div class="row"><h3>First boot</h3><span class="who you">You</span><span class="date">20 Oct</span></div>
+        <p>Wrote the card, opened the serial console through the ST-LINK port (CN11, 115200 baud), logged in as <code>root</code>, and toggled LD8 by hand through <code>/sys/class/leds/heartbeat</code>.</p>
+      </div></li>
+      <li><div>
+        <div class="row"><h3>Added developer tools to the image</h3><span class="who me">Claude</span><span class="date">20 Oct</span></div>
+        <p>Added <code>ssh-server-dropbear tools-debug</code> to <code>EXTRA_IMAGE_FEATURES</code> and rebuilt. Bitbake reused 4,529 of 4,793 tasks from its cache, so this took minutes.</p>
+      </div></li>
+      <li><div>
+        <div class="row"><h3>Built and installed the SDK</h3><span class="who me">Claude</span><span class="date">6 Nov</span></div>
+        <p><code>bitbake core-image-minimal -c populate_sdk</code>, then installed it to <code>~/sdk/dk1</code>.</p>
+        <p class="problem">Two problems on the way. The VM crashed mid-build and left gcc's build files half-written, so we deleted them with <code>bitbake -c clean nativesdk-gcc</code> and rebuilt. Then ST's prebuilt bare-metal Arm toolchain wouldn't install on an ARM64 VM, so we left it out with <code>TOOLCHAIN_HOST_TASK:remove</code>. You don't need it for Linux programs.</p>
+      </div></li>
+      <li><div>
+        <div class="row"><h3>Put the board on the network</h3><span class="who you">You</span><span class="date">6 Nov</span></div>
+        <p>Flashed the card again with the SSH-enabled image, connected Ethernet, and found the board at <code>192.168.0.19</code>. Created an SSH key and copied it to the board by hand, because <code>ssh-copy-id</code> hangs against dropbear's empty-password login.</p>
+      </div></li>
+      <li><div>
+        <div class="row"><h3>Wrote and ran ledblink</h3><span class="who me">Claude</span><span class="date">6 Nov</span></div>
+        <p>Wrote <code>ledblink.c</code> and a Makefile (now in the repo at <code>apps/ledblink</code>), added an SSH alias <code>dk1</code>, then ran <code>make run</code>. LD8 blinked, and the program restored the heartbeat trigger when it finished.</p>
+      </div></li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="sdk-h">
+    <h2 id="sdk-h">The SDK in more detail</h2>
+    <div class="col" style="display:flex;flex-direction:column;gap:1rem">
+      <p>Your VM and the board use different processors. The VM is 64-bit ARM (<code>aarch64</code>, running on your Mac). The board's Cortex-A7 is 32-bit ARMv7. A program compiled by Ubuntu's own <code>gcc</code> would only run on the VM. Compiling on one machine for a different one is called <strong>cross-compiling</strong>, and the SDK is what makes it work.</p>
+      <p>Installing the SDK unpacked three things into <code>~/sdk/dk1</code>:</p>
+      <pre><span class="c"># the compiler, linker and tools: they run on the VM</span>
+sysroots/aarch64-pokysdk-linux/
+<span class="c"># a copy of the board's headers and libraries (glibc etc.), same versions as the image</span>
+sysroots/cortexa7t2hf-neon-vfpv4-poky-linux-gnueabi/
+<span class="c"># a script that points everything at the two folders above</span>
+environment-setup-cortexa7t2hf-neon-vfpv4-poky-linux-gnueabi</pre>
+      <p>Running <code>source</code> on that script only changes settings in the current terminal. The key one is <code>$CC</code>, which is what <code>make</code> uses to compile:</p>
+      <pre>CC=arm-poky-linux-gnueabi-gcc -mthumb -mfpu=neon-vfpv4 -mfloat-abi=hard \
+   -mcpu=cortex-a7 ... --sysroot=/home/horia/sdk/dk1/sysroots/cortexa7t2hf-...</pre>
+      <p><code>-mcpu=cortex-a7</code> tells the compiler which processor to generate code for. <code>--sysroot</code> makes it use the board's copy of the headers and libraries instead of the VM's. That's why the SDK has to come from the same build as the image: if the libraries didn't match, programs could fail to start on the board.</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="cmp-h">
+    <h2 id="cmp-h">Image, SDK and app side by side</h2>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th scope="col"></th><th scope="col" class="board">Flashed image</th><th scope="col" class="host">SDK</th><th scope="col">Your app (ledblink)</th></tr>
+        </thead>
+        <tbody>
+          <tr><th scope="row">What it is</th><td>The board's complete system: bootloaders, kernel, device tree, root filesystem</td><td>Cross-compiler, plus a copy of the board's libraries</td><td>One program</td></tr>
+          <tr><th scope="row">Lives on</th><td>The SD card in the board</td><td>The VM, in <code>~/sdk/dk1</code></td><td>Source on the VM; binary in <code>/home/root</code> on the board</td></tr>
+          <tr><th scope="row">Runs on</th><td>The board's Cortex-A7</td><td>The VM (aarch64)</td><td>The board's Cortex-A7</td></tr>
+          <tr><th scope="row">Made by</th><td><code>bitbake core-image-minimal</code></td><td><code>bitbake core-image-minimal -c populate_sdk</code></td><td><code>make</code>, using the SDK</td></tr>
+          <tr><th scope="row">Size</th><td class="mono">4.8 GB</td><td class="mono">321 MB installer</td><td class="mono">26 KB</td></tr>
+          <tr><th scope="row">Gets there by</th><td><code>dd</code> or STM32CubeProgrammer, replacing everything on the card</td><td>Running the <code>.sh</code> installer on the VM</td><td><code>scp</code> over the network, one file</td></tr>
+          <tr><th scope="row">Redo it when</th><td>You change what's in the system: packages, kernel, device tree, settings</td><td>You add libraries your programs need (rebuild it to match the new image)</td><td>Every time you edit the code</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section aria-labelledby="make-h">
+    <h2 id="make-h">What make run does, step by step</h2>
+    <p class="col">The Makefile chains three targets: <code>run</code> needs <code>deploy</code>, and <code>deploy</code> needs the <code>ledblink</code> binary. <code>make</code> only recompiles if <code>ledblink.c</code> changed since the last build.</p>
+    <div class="steps col">
+      <div class="step">
+        <span class="where host">VM · build</span>
+        <div class="step-body">
+          <p><strong>Compile.</strong> The SDK's cross-compiler turns the source into an ARM program. This happens entirely on the VM.</p>
+          <pre>arm-poky-linux-gnueabi-gcc ... ledblink.c -o ledblink
+<span class="c"># result: ELF 32-bit LSB pie executable, ARM</span></pre>
+        </div>
+      </div>
+      <div class="step">
+        <span class="where host">VM → board</span>
+        <div class="step-body">
+          <p><strong>Copy.</strong> <code>scp</code> sends the compiled binary, not the source, to root's home folder on the board. <code>dk1</code> is the SSH alias for <code>root@192.168.0.19</code>.</p>
+          <pre>scp ledblink dk1:</pre>
+        </div>
+      </div>
+      <div class="step">
+        <span class="where board">Board · run</span>
+        <div class="step-body">
+          <p><strong>Run.</strong> <code>ssh</code> starts the program on the board. Its output comes back over the network to your VS Code terminal, so it looks local, but it runs on the Cortex-A7.</p>
+          <pre>ssh dk1 ./ledblink 200 10</pre>
+        </div>
+      </div>
+    </div>
+    <p class="callout col"><strong>Copying is not flashing.</strong> Flashing writes a whole image over the SD card, replacing the bootloaders, kernel and every file. <code>scp</code> adds one file to the running system and leaves everything else alone. That's why the edit–compile–run loop takes seconds, not hours.</p>
+  </section>
+
+  <section aria-labelledby="map-h">
+    <h2 id="map-h">Where everything lives</h2>
+    <div class="map">
+      <div>
+        <h3 style="color:var(--host)">On the VM</h3>
+<pre>~/yocto/                     <span class="c"># git repo: github.com/HoriaOpris/yocto</span>
+  poky/  meta-openembedded/  meta-st-stm32mp/
+  build-dk1/
+    conf/local.conf          <span class="c"># your build settings</span>
+    tmp/deploy/images/stm32mp15-disco/
+      FlashLayout_sdcard_stm32mp157d-dk1-opteemin.raw
+    tmp/deploy/sdk/          <span class="c"># SDK installer</span>
+  apps/ledblink/
+    ledblink.c  Makefile
+~/sdk/dk1/                   <span class="c"># installed SDK</span>
+~/.ssh/config                <span class="c"># "dk1" alias</span></pre>
+      </div>
+      <div>
+        <h3 style="color:var(--board)">On the board</h3>
+<pre>/sys/class/leds/heartbeat/   <span class="c"># LD8, blue</span>
+  trigger  brightness
+/home/root/
+  ledblink                   <span class="c"># copied by make run</span>
+  .ssh/authorized_keys       <span class="c"># your VM's key</span>
+/usr/sbin/dropbear           <span class="c"># SSH server</span>
+/usr/bin/gdbserver           <span class="c"># remote debugging</span></pre>
+      </div>
+    </div>
+  </section>
+
+  <section aria-labelledby="next-h" class="col">
+    <h2 id="next-h">Next: ship ledblink inside the image</h2>
+    <p>Right now <code>ledblink</code> only exists until the next reflash. The Yocto way to make it permanent is a <strong>recipe</strong> in your own layer, <code>meta-mydk1</code>. A recipe is a short file telling bitbake where the source is and how to build and install it. Bitbake then builds the program the same way the SDK does and puts it at <code>/usr/bin/ledblink</code> in every image. The Makefile already has the <code>install</code> target the recipe will use. It's also a good point to move the DK1 settings out of <code>local.conf</code> into that layer.</p>
+  </section>
+
+  <footer>Written 6 Nov 2026 from this setup: Ubuntu 26.04 VM on aarch64, Yocto 5.0.21 (scarthgap), meta-st-stm32mp, board kernel 6.6.129. Project repo: github.com/HoriaOpris/yocto.</footer>
+</main>
+
+</body>
+</html>

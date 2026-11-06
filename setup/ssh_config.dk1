@@ -1,0 +1,6 @@
+# STM32MP157D-DK1 dev board (Yocto image, dropbear SSH)
+Host dk1
+    HostName 192.168.0.19
+    User root
+    # dropbear 2022.83 has no post-quantum key exchange; fine on a local dev board
+    WarnWeakCrypto no

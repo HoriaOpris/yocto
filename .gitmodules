@@ -1,0 +1,12 @@
+[submodule "poky"]
+	path = poky
+	url = https://git.yoctoproject.org/poky
+	branch = scarthgap
+[submodule "meta-openembedded"]
+	path = meta-openembedded
+	url = https://git.openembedded.org/meta-openembedded
+	branch = scarthgap
+[submodule "meta-st-stm32mp"]
+	path = meta-st-stm32mp
+	url = https://github.com/STMicroelectronics/meta-st-stm32mp
+	branch = scarthgap

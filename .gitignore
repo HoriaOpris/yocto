@@ -1,0 +1,8 @@
+# Build output: tmp/ (~75 GB), downloads/, sstate-cache/, cache/, logs. Only the config is tracked.
+/build-dk1/*
+!/build-dk1/conf/
+/build-dk1/conf/*.lock
+
+# Compiled app binaries (rebuilt with the SDK)
+/apps/ledblink/ledblink
+*.o
